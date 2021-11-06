@@ -99,7 +99,7 @@ if __name__ == '__main__':
     debt_table_total.drop('index', 1, inplace=True)
 
     debt_table_quarters_format = transform_to_quarters_format(debt_table_total, date_column_name='Дата')
-    debt_table_quarters_format['Относительная задолженность'] = \
+    debt_table_quarters_format['Уровень просроченной задолженности'] = \
         debt_table_quarters_format['Просроченная задолженность'] / debt_table_quarters_format['Задолженность']
 
     # plot data before quarters averaging
