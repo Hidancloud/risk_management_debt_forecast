@@ -47,42 +47,60 @@ def extract_data_after_2018():
     return pd.concat([after_19y_debt, after_19y_prosro4eno], axis=1)
 
 
-def transform_to_quarters_format(debt_table):
+def extract_macro_parameters():
+    return pd.read_excel('Interpolationexp2.xlsx', index_col=0, parse_dates=True)
+
+
+def transform_to_quarters_format(custom_table, date_column_name='Дата', already_3month_correct_step=False):
     """
-    Transforms debt_table from month format to quarters taking average for each quarter
-    :param debt_table:
+    Transforms table from month format to quarters taking average for each quarter if necessary
+    :param custom_table: Pandas dataframe
+    :param date_column_name: name of a column with dates
+    :param if the time step between custom_table rows is a 3 month instead of month and correspond to 3, 6, 9, 12 months
     :return: table in correct quarter format with averaged values in columns
     """
-    debt_table_quarters = pd.DataFrame()
-
-    # creates array [1, 1, 1, 2, 2, 2, 3, 3, 3, ...], so i-th month will be from corresponding quarter
-    correct_quarters = np.ones((debt_table.shape[0] // 3 + 3, 3), dtype=int).cumsum(axis=0).flatten()
-    # quarter of the first month in the data
-    first_quarter = (debt_table['Дата'].dt.month[0] - 1) // 3 + 1
-    # assumption: data is not missing a single month
-    # then quarters are from correct_quarters continuous part from [first_quarter to first_quarter + number of months]
-    debt_table['Квартал'] = correct_quarters[first_quarter: debt_table.shape[0] + first_quarter]
+    if not already_3month_correct_step:
+        # creates array [1, 1, 1, 2, 2, 2, 3, 3, 3, ...], so i-th month will be from corresponding quarter
+        # in case when each row corresponds to a month
+        correct_quarters = np.ones((custom_table.shape[0] // 3 + 3, 3), dtype=int).cumsum(axis=0).flatten()
+        # quarter of the first month in the data
+        first_quarter = (custom_table[date_column_name].dt.month[0] - 1) // 3 + 1
+        # assumption: data is not missing a single month
+        # then quarters are from correct_quarters continuous part: [first_quarter to first_quarter + number of months]
+        custom_table['Квартал'] = correct_quarters[first_quarter: custom_table.shape[0] + first_quarter]
+    else:
+        # in case when each row corresponds to either 3, 6, 9 or 12 month (file with macro data)
+        debt_table_quarters = custom_table.copy()
+        debt_table_quarters.reset_index(inplace=True)
+        debt_table_quarters['Квартал'] = custom_table.index.month//3
+        return debt_table_quarters
 
     # calculate average value inside each quarter and assign those values to the resulting table
-    group = debt_table.groupby('Квартал')
-    debt_table_quarters_0 = group['Задолженность'].mean()  # avg for Задолженность inside quarters
-    debt_table_quarters_1 = group['Просроченная задолженность'].mean()  # for Просроченная задолженность
-    debt_table_quarters = pd.concat([debt_table_quarters_0, debt_table_quarters_1], axis=1)
+    group = custom_table.groupby('Квартал')
+    debt_table_quaters_features = dict()
+    for feature in custom_table.columns:
+        if feature != date_column_name and feature != 'Квартал':
+            debt_table_quaters_features[feature] = group[feature].mean()
+    debt_table_quarters = pd.concat(debt_table_quaters_features, axis=1)
     debt_table_quarters.reset_index(inplace=True)
 
     return debt_table_quarters
 
 
 if __name__ == '__main__':
+    # read the files
     before_19y = extract_data_before_2019y()
     after_19y = extract_data_after_2018()
+    new_features = extract_macro_parameters()
 
     # concatenates old and new data
     debt_table_total = pd.concat([before_19y, after_19y])
     debt_table_total.reset_index(inplace=True)
     debt_table_total.drop('index', 1, inplace=True)
 
-    debt_table_quarters_format = transform_to_quarters_format(debt_table_total)
+    debt_table_quarters_format = transform_to_quarters_format(debt_table_total, date_column_name='Дата')
+    debt_table_quarters_format['Относительная задолженность'] = \
+        debt_table_quarters_format['Просроченная задолженность'] / debt_table_quarters_format['Задолженность']
 
     # plot data before quarters averaging
     debt_table_total.plot(x='Дата', y=['Задолженность', 'Просроченная задолженность'])
@@ -92,3 +110,12 @@ if __name__ == '__main__':
     debt_table_quarters_format.plot(x=['Квартал', 'Квартал'], y=['Задолженность', 'Просроченная задолженность'],
                                     kind='scatter')
     plt.show()
+
+    # add macro features:
+    interpolated_new_features = new_features.interpolate(method='time', limit_direction='both', downcast='infer')
+    interpolated_new_features_quarter_format = \
+        transform_to_quarters_format(interpolated_new_features, date_column_name='Отчетная дата (по кварталам)',
+                                     already_3month_correct_step=True)
+
+    all_features = pd.concat([debt_table_quarters_format, interpolated_new_features_quarter_format], axis=1)
+    all_features.to_excel('Dataset.xlsx', index=False)  # save the dataset
