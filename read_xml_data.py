@@ -13,7 +13,7 @@ def extract_data_before_2019y():
     Extracts data from the 302-19.xlsx file
     :return: pandas dataframe with columns 'Дата', 'Задолженность', 'Просроченная задолженность'
     """
-    return pd.read_excel('302-19.xlsx', usecols=[0, 5, 11], skiprows=list(range(7)),
+    return pd.read_excel('data_folder/302-19.xlsx', usecols=[0, 5, 11], skiprows=list(range(7)),
                           names=['Дата', 'Задолженность', 'Просроченная задолженность'])
 
 
@@ -24,7 +24,7 @@ def extract_data_after_2018():
     """
     # read Задолженность from the page МСП Итого
     # .T to make rows for entities and columns for properties
-    after_19y_debt = pd.read_excel('01_13_F_Debt_sme_subj.xlsx', skiprows=1, nrows=1, sheet_name='МСП Итого ').T
+    after_19y_debt = pd.read_excel('data_folder/01_13_F_Debt_sme_subj.xlsx', skiprows=1, nrows=1, sheet_name='МСП Итого ').T
     after_19y_debt.reset_index(inplace=True)
     # remove odd row after transpose
     after_19y_debt.drop(labels=0, axis=0, inplace=True)
@@ -35,7 +35,7 @@ def extract_data_after_2018():
     after_19y_debt = after_19y_debt.astype({after_19y_debt.columns[1]: 'int32'}, copy=False)
 
     # read Просроченная задолженность from the page МСП в т.ч. просроч.
-    after_19y_prosro4eno = pd.read_excel('01_13_F_Debt_sme_subj.xlsx', skiprows=2, nrows=0,
+    after_19y_prosro4eno = pd.read_excel('data_folder/01_13_F_Debt_sme_subj.xlsx', skiprows=2, nrows=0,
                                          sheet_name='МСП в т.ч. просроч.').T
     after_19y_prosro4eno.reset_index(inplace=True)
     # remove odd row after transpose
@@ -48,7 +48,7 @@ def extract_data_after_2018():
 
 
 def extract_macro_parameters():
-    return pd.read_excel('Interpolationexp2.xlsx', index_col=0, parse_dates=True)
+    return pd.read_excel('data_folder/Interpolationexp2.xlsx', index_col=0, parse_dates=True)
 
 
 def transform_to_quarters_format(custom_table, date_column_name='Дата', already_3month_correct_step=False):
@@ -118,4 +118,4 @@ if __name__ == '__main__':
                                      already_3month_correct_step=True)
 
     all_features = pd.concat([debt_table_quarters_format, interpolated_new_features_quarter_format], axis=1)
-    all_features.to_excel('Dataset.xlsx', index=False)  # save the dataset
+    all_features.to_excel('Dataset.xlsx', index=False)  # save the dataset into the project directory
