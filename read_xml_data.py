@@ -147,5 +147,5 @@ if __name__ == '__main__':
                                      already_3month_correct_step=True)
 
     all_features = pd.concat([debt_table_quarters_format, interpolated_new_features_quarter_format], axis=1)
-    all_features = all_features.iloc[:, :-1]  # removing an odd column
+    all_features = all_features.iloc[:, :-1]  # removing an odd last column
     all_features.to_excel('Dataset.xlsx', index=False)  # save the dataset into the project directory
