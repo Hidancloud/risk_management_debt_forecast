@@ -7,7 +7,7 @@ warnings.simplefilter("ignore")
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
-online = True  # if True: download xml files from github URL
+online = False  # if True: download xml files from github URL
 # be careful: online version will not work if requirements from requirements.txt are not satisfied!
 
 if online:
@@ -80,23 +80,28 @@ def extract_macro_parameters():
     return pd.read_excel('data_folder/Interpolationexp2.xlsx', index_col=0, parse_dates=True)
 
 
-def transform_to_quarters_format(custom_table, date_column_name='Дата', already_3month_correct_step=False):
+def transform_to_quarters_format(custom_table, date_column_name='Дата',
+                                 already_3month_correct_step=False):
     """
-    Transforms table from month format to quarters taking average for each quarter if necessary
+    Transforms table from month format to quarters taking the last month element for each quarter
     :param custom_table: Pandas dataframe
     :param date_column_name: name of a column with dates
-    :param if the time step between custom_table rows is a 3 month instead of month and correspond to 3, 6, 9, 12 months
+    :param already_3month_correct_step: if the time step between custom_table rows is a 3 month instead of month
+           and correspond to 3, 6, 9, 12 months
     :return: table in correct quarter format with averaged values in columns
     """
     if not already_3month_correct_step:
+        # quarter of the first month in the data
+        first_quarter = (custom_table[date_column_name].dt.month[0] - 1) // 3 + 1
+
         # creates array [1, 1, 1, 2, 2, 2, 3, 3, 3, ...], so i-th month will be from corresponding quarter
         # in case when each row corresponds to a month
         correct_quarters = np.ones((custom_table.shape[0] // 3 + 3, 3), dtype=int).cumsum(axis=0).flatten()
-        # quarter of the first month in the data
-        first_quarter = (custom_table[date_column_name].dt.month[0] - 1) // 3 + 1
+
         # assumption: the data is not missing a single month
-        # then quarters are from correct_quarters continuous part: [first_quarter to first_quarter + number of months]
-        custom_table['Квартал'] = correct_quarters[first_quarter: custom_table.shape[0] + first_quarter]
+        # then quarters are from correct_quarters continuous part
+        custom_table['Квартал'] = correct_quarters[3*(first_quarter-1): custom_table.shape[0] + 3*(first_quarter-1)]
+
     else:
         # in case when each row corresponds to either 3, 6, 9 or 12 month (file with macro data)
         debt_table_quarters = custom_table.copy()
@@ -104,15 +109,14 @@ def transform_to_quarters_format(custom_table, date_column_name='Дата', alre
         debt_table_quarters['Квартал'] = custom_table.index.month // 3
         return debt_table_quarters
 
-    # calculate average value inside each quarter and assign those values to the resulting table
+    # take the last value (last month value) inside each quarter and assign those values to the resulting table
     group = custom_table.groupby('Квартал')
     debt_table_quaters_features = dict()
     for feature in custom_table.columns:
         if feature != date_column_name and feature != 'Квартал':
-            debt_table_quaters_features[feature] = group[feature].mean()
+            debt_table_quaters_features[feature] = group[feature].nth(2)
     debt_table_quarters = pd.concat(debt_table_quaters_features, axis=1)
     debt_table_quarters.reset_index(inplace=True)
-
     return debt_table_quarters
 
 
@@ -149,3 +153,5 @@ if __name__ == '__main__':
     all_features = pd.concat([debt_table_quarters_format, interpolated_new_features_quarter_format], axis=1)
     all_features = all_features.iloc[:, :-1]  # removing an odd last column
     all_features.to_excel('Dataset.xlsx', index=False)  # save the dataset into the project directory
+    # all_features.columns = ['q', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n']
+    # all_features.to_csv('Dataset.csv', encoding='cp1251')
